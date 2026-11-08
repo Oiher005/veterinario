@@ -10,24 +10,50 @@ router.post('/', async (req, res, next) => {
 });
 
 // 2. GET /api/vets?day=lunes&speciality=perros
-//    - Los que atienden ese día O tienen esa especialidad ($or)
-//    - Si solo llega uno de los parámetros, usar solo ese
-//    - Si no llega ninguno, todos los veterinarios (¡un $or vacío da error!)
-//    - Pista: { availableDays: 'lunes' } busca dentro del array
-  //    - Convierte cada parámetro a texto con String(): así nadie puede colar un objeto
-  //      (por ejemplo { $ne: null }) en el filtro (inyección NoSQL)
 router.get('/', async (req, res, next) => {
-  // TODO
-  res.status(501).json({ error: 'Sin implementar' });
+  try {
+    const { day, speciality } = req.query;
+    const conditions = [];
+
+    if (day) {
+      conditions.push({ availableDays: String(day) });
+    }
+    if (speciality) {
+      conditions.push({ speciality: String(speciality) });
+    }
+
+    let filter = {};
+    if (conditions.length === 1) {
+      filter = conditions[0]; 
+    } else if (conditions.length > 1) {
+      filter = { $or: conditions }; 
+    }
+
+    const vets = await Vet.find(filter);
+    res.json(vets);
+  } catch (err) {
+    next(err);
+  }
 });
 
 // 3. PATCH /api/vets/:id: actualizar el email del veterinario
-//    - findByIdAndUpdate(id, cambios, { returnDocument: 'after', runValidators: true })
-//    - Si no existe → 404
-//    - Email no válido → 400
 router.patch('/:id', async (req, res, next) => {
-  // TODO
-  res.status(501).json({ error: 'Sin implementar' });
+  try {
+    const vet = await Vet.findByIdAndUpdate(
+      req.params.id,
+      { email: req.body.email },
+      { returnDocument: 'after', runValidators: true }
+    );
+
+    if (!vet) {
+      return res.status(404).json({ error: 'Veterinario no encontrado' });
+    }
+
+    res.json(vet);
+  } catch (err) {
+
+    next(err);
+  }
 });
 
 module.exports = router;
