@@ -12,30 +12,64 @@ router.get('/', async (req, res, next) => {
 });
 
 // 5. GET /api/appointments/upcoming: próximas citas programadas, ordenadas por fecha
-//    - Solo las de hoy en adelante y con status 'scheduled'
-//    - Filtro opcional: ?vet=<id> → solo las de ese veterinario
-//    - populate: veterinario (name, speciality) y mascota (name, species) → su dueño (name, email)
-//    - Pista: es parecido al ejemplo de la diapositiva «Relaciones: populate()»
 router.get('/upcoming', async (req, res, next) => {
-  // TODO
-  res.status(501).json({ error: 'Sin implementar' });
+  try {
+    const { vet } = req.query;
+    
+    const filter = {
+      date: { $gte: new Date() },
+      status: 'scheduled'
+    };
+
+    if (vet) {
+      filter.vet = vet;
+    }
+
+    const appointments = await Appointment.find(filter)
+      .sort({ date: 1 })
+      .populate({ path: 'vet', select: 'name speciality' })
+      .populate({
+        path: 'pet',
+        select: 'name species',
+        populate: {
+          path: 'owner',
+          select: 'name email'
+        }
+      });
+
+    res.json(appointments);
+  } catch (err) {
+    next(err);
+  }
 });
 
 // 4. POST /api/appointments: crear una cita
-//    - Comprueba que existen la mascota y el veterinario (Pet.exists / Vet.exists, o findById)
-//    - Si no existen → 400
-//    - 201 + la cita creada
 router.post('/', async (req, res, next) => {
-  // TODO
-  res.status(501).json({ error: 'Sin implementar' });
+  try {
+    const { pet, vet } = req.body;
+
+    const petExists = await Pet.exists({ _id: pet });
+    const vetExists = await Vet.exists({ _id: vet });
+
+    if (!petExists || !vetExists) {
+      return res.status(400).json({ error: 'La mascota o el veterinario especificados no existen' });
+    }
+
+    const newAppointment = await Appointment.create(req.body);
+    res.status(201).json(newAppointment);
+  } catch (err) {
+    next(err);
+  }
 });
 
 // 6. DELETE /api/appointments/past: eliminar las citas pasadas
-//    - deleteMany + { $lt: new Date() } sobre la fecha
-//    - Respuesta: { deleted: <número de citas eliminadas> } (pista: deletedCount)
 router.delete('/past', async (req, res, next) => {
-  // TODO
-  res.status(501).json({ error: 'Sin implementar' });
+  try {
+    const result = await Appointment.deleteMany({ date: { $lt: new Date() } });
+    res.json({ deleted: result.deletedCount });
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = router;
